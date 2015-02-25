@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 
-long int factorial(int n);
+int factorial(int n);
 
 /* Write to /proc file to register the process with RMS */
 void register_process(unsigned long pid, unsigned long period, unsigned long computation) {
@@ -30,10 +30,10 @@ int is_registerd(unsigned long pid) {
  		if(fpid == pid) {
  			is_registerd = 1;
  			break;
- 		}		
+ 		}
  	}
  	fclose(fp);
- 	return is_registerd; 
+ 	return is_registerd;
  }
 
 /* Write to /proc file to signal that we have finished task for this period and yield. */
@@ -65,13 +65,13 @@ int main(int argc, char *argv[]) {
 	printf("%lu: registerd\n", pid);
 	yield(pid);
 
-	
+
 }
 
-long int factorial(int n) {
-	if(n == 1) 
+int factorial(int n) {
+	if(n == 1)
 		return 1;
-	else 
+	else
 		return n * factorial(n-1);
 }
 

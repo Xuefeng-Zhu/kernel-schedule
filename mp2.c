@@ -56,7 +56,7 @@ void delete_pid_sched_list(void) {
       tmp = list_entry(head, struct pid_sched_list, list);
       list_del(head);
       kfree(tmp);
-   }   
+   }
 }
 
 /* Helper function to create the directory entries for /proc */
@@ -68,18 +68,18 @@ void create_mp2_proc_files(void) {
 /* Helper function to delete the directory entries for /proc */
 void delete_mp2_proc_files(void) {
    remove_proc_entry(FILE_NAME, pdir_mp2);
-   remove_proc_entry(DIR_NAME, NULL);   
+   remove_proc_entry(DIR_NAME, NULL);
 }
 
 /* Occurs when a user runs cat /proc/mp2/status
    Needs to return a list of PID and their period and compute time.
 */
 ssize_t read_proc(struct file *filp, char *user, size_t count, loff_t *offset)
-{	 
+{
    int pos = 0;
    int len;
    char *buf = (char *)kmalloc(count, GFP_KERNEL);
-   
+
    #ifdef DEBUG
    printk("/proc/mp2/status read\n");
    #endif
@@ -88,7 +88,7 @@ ssize_t read_proc(struct file *filp, char *user, size_t count, loff_t *offset)
       kfree((void *)buf);
       return 0;
    }
-   
+
    list_for_each(head, &pid_sched_list.list) {
       tmp = list_entry(head, struct pid_sched_list, list);
       len = sprintf(buf + pos, "PID: %lu, Period: %lu, Processing Time: %lu\n", tmp->pid, tmp->period, tmp->computation);
@@ -102,7 +102,7 @@ ssize_t read_proc(struct file *filp, char *user, size_t count, loff_t *offset)
    return pos;
 }
 
-/* Occurs when a user runs ./process > /proc/mp2/status 
+/* Occurs when a user runs ./process > /proc/mp2/status
    Input format should either be: "R PID PERIOD COMPUTATION"
                                   "Y PID"
                                   "D PID"
@@ -116,27 +116,27 @@ ssize_t write_proc(struct file *filp, const char *user, size_t count, loff_t *of
    copy_from_user(buf, user, count);
    type = buf[0];
 
-   switch(type) 
+   switch(type)
    {
       case 'R':
          tmp = kmem_cache_alloc(task_cache, GFP_KERNEL);
-         sscanf(&buf[1], "%lu %lu %lu", &tmp->pid, &tmp->period, &tmp->computation);         
+         sscanf(&buf[1], "%lu %lu %lu", &tmp->pid, &tmp->period, &tmp->computation);
          tmp->linux_task = find_task_by_pid(tmp->pid);
          setup_timer(&tmp->wakeup_timer, ready_task, (unsigned long)tmp);
-         tmp->state = SLEEPING; 
+         tmp->state = SLEEPING;
 
          if(task_admissible(tmp->period, tmp->computation)) {
-            /* Add a task entry */   	 
+            /* Add a task entry */
             spin_lock(&list_lock);
             list_add(&(tmp->list), &(pid_sched_list.list));
-            spin_unlock(&list_lock);   
+            spin_unlock(&list_lock);
             #ifdef DEBUG
-   	    printk("PROCESS REGISTERED: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
-   	    #endif  
+            printk("PROCESS REGISTERED: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
+            #endif
          } else {
             #ifdef DEBUG
-   	    printk("PROCESS NOT SCHEDUABLE: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
-   	    #endif  
+            printk("PROCESS NOT SCHEDUABLE: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
+            #endif
          }
          break;
       case 'Y':
@@ -144,18 +144,18 @@ ssize_t write_proc(struct file *filp, const char *user, size_t count, loff_t *of
          sscanf(&buf[1], "%lu", &pid);
          context_switch(NULL);
          #ifdef DEBUG
-   	 printk("PROCESS YIELDED: %lu\n", pid);
-   	 #endif  
+         printk("PROCESS YIELDED: %lu\n", pid);
+         #endif
          break;
       case 'D':
          sscanf(&buf[1], "%lu", &pid);
-         
+
          list_for_each_safe(head, next, &pid_sched_list.list) {
             tmp = list_entry(head, struct pid_sched_list, list);
             if(tmp->pid == pid) {
                list_del(head);
                kmem_cache_free(task_cache, tmp);
-               
+
                #ifdef DEBUG
                printk("PROCESS DEREGISTERED: %lu\n", pid);
                #endif
@@ -169,20 +169,20 @@ ssize_t write_proc(struct file *filp, const char *user, size_t count, loff_t *of
 }
 
 /* Sets task to ready (callback for when wakeup timer expires)  */
-void ready_task(unsigned long data) 
+void ready_task(unsigned long data)
 {
    struct pid_sched_list *exp_task = (struct pid_sched_list *)data;
    exp_task->state = READY;
-   
+
    wake_up_process(dispatch_thread);
 
 }
 
-/* Executes a context switch.  Occurs either when 
-   wakeup timer expires or YIELD is called 
+/* Executes a context switch.  Occurs either when
+   wakeup timer expires or YIELD is called
    TODO: Set task states to READY, SLEEPING OR RUNNING
 */
-int context_switch(void *data) 
+int context_switch(void *data)
 {
    struct sched_param sparam;
    struct task_struct *new_task;
@@ -196,7 +196,7 @@ int context_switch(void *data)
    #endif
 
    // Preempt the old task
-   old_entry = get_pcb_from_task(current_task);
+   old_entry = get_pcb_from_task(mp2_current_task);
    if(old_entry->state == RUNNING) {
       old_entry->state = READY;
    } else {
@@ -204,7 +204,7 @@ int context_switch(void *data)
    }
 
    sparam.sched_priority=0;
-   sched_setscheduler(mp2_current_task, SCHED_FIFO, &sparam);
+   sched_setscheduler(mp2_current_task, SCHED_NORMAL, &sparam);
 
    // Schedule the new task
    new_task = get_next_task();
@@ -213,7 +213,7 @@ int context_switch(void *data)
    wake_up_process(new_task);
    sparam.sched_priority=99;
    sched_setscheduler(new_task, SCHED_FIFO, &sparam);
-   
+
    // Update the current task
    mp2_current_task = new_task;
 
@@ -240,7 +240,7 @@ int task_admissible(unsigned long period, unsigned long computation) {
 
    list_for_each(head, &pid_sched_list.list) {
       tmp = list_entry(head, struct pid_sched_list, list);
-      util += (10000 * tmp->computation) / tmp->period;   
+      util += (10000 * tmp->computation) / tmp->period;
    }
 
    util += (10000 * computation) / period;
@@ -270,7 +270,7 @@ int __init mp2_init(void)
    printk(KERN_ALERT "MP2 MODULE LOADING\n");
    #endif
 
-   INIT_LIST_HEAD(&pid_sched_list.list);   
+   INIT_LIST_HEAD(&pid_sched_list.list);
    create_mp2_proc_files();
    task_cache = kmem_cache_create("mp2_task_cache",
                                   sizeof(struct pid_sched_list),
@@ -282,7 +282,7 @@ int __init mp2_init(void)
    spin_lock_init(&list_lock);
 
    printk(KERN_ALERT "MP2 MODULE LOADED\n");
-   return 0;   
+   return 0;
 }
 
 /* Called when module is unloaded */
@@ -291,7 +291,7 @@ void __exit mp2_exit(void)
    #ifdef DEBUG
    printk(KERN_ALERT "MP2 MODULE UNLOADING\n");
    #endif
-   
+
    // Cleans up the file entries in /proc and the data structures
    kthread_stop(dispatch_thread);
    kmem_cache_destroy(task_cache);
