@@ -16,8 +16,11 @@ struct pid_sched_list {
    unsigned long pid;
    unsigned long period;
    unsigned long computation;
-   task_state state; 
+   task_state state;
 };
+
+/* Helper function to get a pcb entry from a task */
+struct pid_sched_list* get_pcb_from_task(struct task_struct *task);
 
 /* Sets task to ready (callback for when wakeup timer expires)  */
 void ready_task(unsigned long data);

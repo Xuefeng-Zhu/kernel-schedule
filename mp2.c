@@ -187,16 +187,29 @@ int context_switch(void *data)
    struct sched_param sparam;
    struct task_struct *new_task;
 
+   struct pid_sched_list *new_entry;
+   struct pid_sched_list *old_entry;
+
+
    #ifdef DEBUG
    printk("Context Switching...\n");
    #endif
 
    // Preempt the old task
+   old_entry = get_pcb_from_task(current_task);
+   if(old_entry->state == RUNNING) {
+      old_entry->state = READY;
+   } else {
+      old_entry->state = SLEEPING;
+   }
+
    sparam.sched_priority=0;
    sched_setscheduler(mp2_current_task, SCHED_FIFO, &sparam);
 
    // Schedule the new task
    new_task = get_next_task();
+   new_entry = get_pcb_from_task(new_task);
+   new_entry->state = RUNNING;
    wake_up_process(new_task);
    sparam.sched_priority=99;
    sched_setscheduler(new_task, SCHED_FIFO, &sparam);
@@ -211,6 +224,17 @@ int context_switch(void *data)
    return 0;
 }
 
+struct pid_sched_list* get_pcb_from_task(struct task_struct *task) {
+   list_for_each(head, &pid_sched_list.list) {
+      tmp = list_entry(head, struct pid_sched_list, list);
+      if(tmp->linux_task == task) {
+         return tmp;
+      }
+   }
+   return NULL;
+}
+
+
 int task_admissible(unsigned long period, unsigned long computation) {
    unsigned long util = 0;
 
@@ -218,6 +242,8 @@ int task_admissible(unsigned long period, unsigned long computation) {
       tmp = list_entry(head, struct pid_sched_list, list);
       util += (10000 * tmp->computation) / tmp->period;   
    }
+
+   util += (10000 * computation) / period;
 
    return util <= 6930;
 }
