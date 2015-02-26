@@ -40,6 +40,9 @@ void delete_pid_sched_list(void);
 /* Helper function to create the directory entries for /proc */
 void create_mp2_proc_files(void);
 
+/* Helper function to delete the entries for /proc */
+void delete_mp2_proc_files(void);
+
 /* /proc file read op */
 ssize_t read_proc(struct file *filp, char *user, size_t count, loff_t *offset);
 
@@ -51,5 +54,7 @@ int __init mp2_init(void);
 
 /* Called when module is unloaded */
 void __exit mp2_exit(void);
+
+
 
 #endif
