@@ -134,6 +134,7 @@ ssize_t write_proc(struct file *filp, const char *user, size_t count, loff_t *of
             printk("PROCESS REGISTERED: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
             #endif
          } else {
+            kmem_cache_free(tmp);
             #ifdef DEBUG
             printk("PROCESS NOT SCHEDUABLE: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
             #endif
