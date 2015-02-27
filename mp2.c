@@ -156,6 +156,7 @@ ssize_t write_proc(struct file *filp, const char *user, size_t count, loff_t *of
          list_for_each_safe(head, next, &pid_sched_list.list) {
             tmp = list_entry(head, struct pid_sched_list, list);
             if(tmp->pid == pid) {
+               del_timer(&tmp->wakeup_timer);
                list_del(head);
                kmem_cache_free(task_cache, tmp);
 
