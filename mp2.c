@@ -145,6 +145,7 @@ ssize_t write_proc(struct file *filp, const char *user, size_t count, loff_t *of
       case 'Y':
          /* Switch context */
          sscanf(&buf[1], "%lu", &pid);
+         // TODO set the task to sleep
          context_switch(NULL);
          #ifdef DEBUG
          printk("PROCESS YIELDED: %lu\n", pid);
@@ -153,18 +154,21 @@ ssize_t write_proc(struct file *filp, const char *user, size_t count, loff_t *of
       case 'D':
          sscanf(&buf[1], "%lu", &pid);
 
+         spin_lock_irqsave(&list_lock);
          list_for_each_safe(head, next, &pid_sched_list.list) {
             tmp = list_entry(head, struct pid_sched_list, list);
             if(tmp->pid == pid) {
                del_timer(&tmp->wakeup_timer);
                list_del(head);
                kmem_cache_free(task_cache, tmp);
+               break;
 
                #ifdef DEBUG
                printk("PROCESS DEREGISTERED: %lu\n", pid);
                #endif
             }
          }
+         spin_unlock_irqsave(&list_lock);
          break;
    }
 
@@ -255,8 +259,8 @@ int task_admissible(unsigned long period, unsigned long computation) {
 /* Finds the highest priority ready task in the list */
 struct task_struct *get_next_task(void) {
    struct task_struct *task = NULL;
-   unsigned long min_period = ULONG_MAX;
 
+   // TODO return pid_sched_list instead?
    list_for_each(head, &pid_sched_list.list) {
       tmp = list_entry(head, struct pid_sched_list, list);
       if((tmp->state == READY) && (tmp->period < min_period)) {
