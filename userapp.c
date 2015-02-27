@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
 	unsigned long pid = getpid();
 	unsigned long period = atoi(argv[2]);
 	int iterations  = atoi(argv[3]);
-	unsigned long computation = compute_time;
+	unsigned long computation = compute_time();
 	
 	register_process(pid, period, computation);
 	if(!is_registerd(pid)) {
