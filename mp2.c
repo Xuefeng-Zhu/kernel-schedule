@@ -54,8 +54,9 @@ struct file_operations proc_fops = {
 void delete_pid_sched_list(void) {
    list_for_each_safe(head, next, &pid_sched_list.list) {
       tmp = list_entry(head, struct pid_sched_list, list);
+      del_timer(&tmp->wakeup_timer);
       list_del(head);
-      kfree(tmp);
+      kmem_cache_free(task_cache, tmp);
    }
 }
 
@@ -134,7 +135,8 @@ ssize_t write_proc(struct file *filp, const char *user, size_t count, loff_t *of
             printk("PROCESS REGISTERED: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
             #endif
          } else {
-            kmem_cache_free(tmp);
+            del_timer(&tmp->wakeup_timer);
+            kmem_cache_free(task_cache, tmp);
             #ifdef DEBUG
             printk("PROCESS NOT SCHEDUABLE: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
             #endif

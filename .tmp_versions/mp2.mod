@@ -1,2 +1,2 @@
-/home/cs423/MP2/mp2.ko
-/home/cs423/MP2/mp2.o
+/home/cs423/dan/kernel-schedule/mp2.ko
+/home/cs423/dan/kernel-schedule/mp2.o
