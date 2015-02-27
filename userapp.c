@@ -64,7 +64,7 @@ unsigned long compute_time(){
 	
 }
 
-
+/* Main function that takes two arguments from users: period and number of jobs. */
 int main(int argc, char *argv[]) {
 	unsigned long pid = getpid();
 	unsigned long period = atoi(argv[2]);
