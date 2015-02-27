@@ -4,3 +4,4 @@ userapp
 *.o
 modules.order
 Module.symvers
+*.cmd
