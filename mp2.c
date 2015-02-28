@@ -37,6 +37,7 @@ static struct pid_sched_list *tmp;
 
 /* Spinlock to protect the linked list */
 static spinlock_t list_lock;
+static unsigned long lock_flag;
 
 /* Cache for mp2_task_struct slab allocation */
 static struct kmem_cache *task_cache;
@@ -143,9 +144,9 @@ void register_handler(char *buf){
 
    if(task_admissible(tmp->period, tmp->computation)) {
       /* Add a task entry */
-      spin_lock(&list_lock);
+      spin_lock_irqsave(&list_lock, lock_flag);
       list_add(&(tmp->list), &(pid_sched_list.list));
-      spin_unlock(&list_lock);
+      spin_unlock_irqrestore(&list_lock, lock_flag);
       #ifdef DEBUG
       printk("PROCESS REGISTERED: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
       #endif
@@ -161,10 +162,21 @@ void register_handler(char *buf){
 /* Helper function to yield a task */
 void yield_handler(char *buf){
    unsigned long pid;
+   unsigned long running_duration, sleep_duration;
+   struct pid_sched_list *sched_task;
 
    sscanf(&buf[1], "%lu", &pid);
+   sched_task = get_pcb_from_pid(pid);
+   // Set the task to Sleep
+   sched_task->state = SLEEPING;
+   set_task_state(sched_task->linux_task, TASK_UNINTERRUPTIBLE);
+   schedule();
 
-   // TODO set the task to sleep
+   // Set the timer
+   running_duration = (jiffies_to_msecs(jiffies) - sched_task->period_start);
+   sleep_duration = sched_task->period - (running_duration % sched_task->period);
+   mod_timer(&(sched_task->wakeup_timer), jiffies + msecs_to_jiffies(sleep_duration));
+
    context_switch(NULL);
    #ifdef DEBUG
    printk("PROCESS YIELDED: %lu\n", pid);
@@ -177,7 +189,7 @@ void deregister_handler(char *buf){
 
    sscanf(&buf[1], "%lu", &pid);
 
-   spin_lock(&list_lock);
+   spin_lock_irqsave(&list_lock, lock_flag);
    list_for_each_safe(head, next, &pid_sched_list.list) {
       tmp = list_entry(head, struct pid_sched_list, list);
       if(tmp->pid == pid) {
@@ -191,7 +203,7 @@ void deregister_handler(char *buf){
          #endif
       }
    }
-   spin_unlock(&list_lock);
+   spin_unlock_irqrestore(&list_lock, lock_flag);
 }
 
 
@@ -200,6 +212,7 @@ void ready_task(unsigned long data)
 {
    struct pid_sched_list *exp_task = (struct pid_sched_list *)data;
    exp_task->state = READY;
+   exp_task->period_start = jiffies_to_msecs(jiffies);
 
    wake_up_process(dispatch_thread);
 
@@ -213,8 +226,8 @@ int context_switch(void *data)
 {
    struct sched_param sparam;
 
-   struct pid_sched_list *new_entry;
-   struct pid_sched_list *old_entry;
+   struct pid_sched_list *new_task;
+   struct pid_sched_list *old_task;
 
 
    #ifdef DEBUG
@@ -222,28 +235,34 @@ int context_switch(void *data)
    #endif
 
    // Preempt the old task
-   old_entry = get_pcb_from_pid(mp2_current_task->pid);
-   if(old_entry->state == RUNNING) {
-      old_entry->state = READY;
-   } else {
-      old_entry->state = SLEEPING;
+   new_task = get_next_task();
+   if (mp2_current_task != NULL){
+      old_task = get_pcb_from_pid(mp2_current_task->pid);
+      sparam.sched_priority=0;
+      sched_setscheduler(mp2_current_task, SCHED_NORMAL, &sparam);
+   }
+   else{
+      old_task = NULL;
    }
 
-   sparam.sched_priority=0;
-   sched_setscheduler(mp2_current_task, SCHED_NORMAL, &sparam);
 
-   // Schedule the new task
-   new_entry = get_next_task();
-   new_entry->state = RUNNING;
-   wake_up_process(new_entry->linux_task);
-   sparam.sched_priority=99;
-   sched_setscheduler(new_entry->linux_task, SCHED_FIFO, &sparam);
+   if (new_task != NULL){
+      if(old_task != NULL && new_task->period < old_task->period
+       && old_task->state == RUNNING) {
+         old_task->state = READY;
+      }       
 
-   // Update the current task
-   mp2_current_task = new_entry->linux_task;
+      if (old_task == NULL || new_task->period < old_task->period){
+            new_task->state = RUNNING;
+            wake_up_process(new_task->linux_task);
+            sparam.sched_priority=99;
+            sched_setscheduler(new_task->linux_task, SCHED_FIFO, &sparam);       
+            mp2_current_task = new_task->linux_task;
+      }
+   }   
 
    // Sleep the dispatch thread
-   set_current_state(TASK_INTERRUPTIBLE);
+   set_current_state(TASK_UNINTERRUPTIBLE);
    schedule();
 
    return 0;
@@ -293,6 +312,8 @@ int __init mp2_init(void)
    #ifdef DEBUG
    printk(KERN_ALERT "MP2 MODULE LOADING\n");
    #endif
+
+   mp2_current_task = NULL;
 
    INIT_LIST_HEAD(&pid_sched_list.list);
    create_mp2_proc_files();

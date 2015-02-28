@@ -55,6 +55,8 @@ void de_register(unsigned long pid) {
 
 unsigned long compute_time(){
 	struct timeval time;
+	unsigned long time_elapsed;
+	
 	gettimeofday(&time);                                                    
 	unsigned int start_time = time.tv_usec;
 	factorial(10);

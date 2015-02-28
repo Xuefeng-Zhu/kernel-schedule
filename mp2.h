@@ -16,6 +16,7 @@ struct pid_sched_list {
    unsigned long pid;
    unsigned long period;
    unsigned long computation;
+   unsigned long period_start;
    task_state state;
 };
 
