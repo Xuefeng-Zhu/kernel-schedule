@@ -54,14 +54,14 @@ void de_register(unsigned long pid) {
 }
 
 unsigned long compute_time(){
-	struct timeval time;
+	struct timeval start_time, end_time;
 	unsigned long time_elapsed;
 	
-	gettimeofday(&time);                                                    
-	unsigned int start_time = time.tv_usec;
+	gettimeofday(&start_time);                                                    
 	factorial(10);
- 	gettimeofday(&time);
- 	time_elapsed = time.tv_usec - start_time;
+ 	gettimeofday(&end_time);
+ 	time_elapsed = (end_time.tv_sec - start_time.tv_sec)*1000 + (end_time.tv_usec - start_time.tv_usec)/1000;
+ 	perror("test\n");
  	return time_elapsed;
 	
 }
@@ -69,8 +69,8 @@ unsigned long compute_time(){
 /* Main function that takes two arguments from users: period and number of jobs. */
 int main(int argc, char *argv[]) {
 	unsigned long pid = getpid();
-	unsigned long period = atoi(argv[2]);
-	int iterations  = atoi(argv[3]);
+	unsigned long period = atoi(argv[1]);
+	int iterations  = atoi(argv[2]);
 	unsigned long computation = compute_time();
 	
 	register_process(pid, period, computation);
