@@ -4,7 +4,15 @@
 #include <time.h>
 
 
-unsigned long factorial(int n);
+int fibonacci(int n)
+{
+   if (n <= 0)
+      return 0;
+   else if (n == 1)
+      return 1;
+   else
+      return fibonacci(n-1) + fibonacci(n-2);
+}
 
 /* Write to /proc file to register the process with RMS */
 void register_process(unsigned long pid, unsigned long period, unsigned long computation) {
@@ -18,6 +26,8 @@ void register_process(unsigned long pid, unsigned long period, unsigned long com
    return 1 is successful, 0 otherwise.
 */
 int is_registerd(unsigned long pid) {
+	printf("%lu: checking...\n", pid);
+
  	int is_registerd = 0;
  	FILE *fp; // define file pointer
  	fp = fopen("/proc/mp2/status", "r");
@@ -27,13 +37,15 @@ int is_registerd(unsigned long pid) {
  	}
 
  	unsigned long fpid; // this will hold the current PID from file
- 	while(fscanf(fp, "%lu", &fpid) != EOF) {
+ 	while(fscanf(fp, "PID: %lu", &fpid) != EOF) {
+ 		printf("%lu\n", fpid);
  		if(fpid == pid) {
  			is_registerd = 1;
  			break;
  		}
  	}
  	fclose(fp);
+ 	printf("%lu: finish checking...\n", pid);
  	return is_registerd;
  }
 
@@ -43,6 +55,7 @@ int is_registerd(unsigned long pid) {
  	char echo_buf[100];
  	sprintf(echo_buf, "echo Y %lu > /proc/mp2/status", pid);
  	system(echo_buf);
+ 	printf("%lu: finish yileding...\n", pid);
  }
 
  /* Write to /proc file to signal that we have finished the application and de-register the process */
@@ -56,14 +69,13 @@ void de_register(unsigned long pid) {
 unsigned long compute_time(){
 	struct timeval start_time, end_time;
 	unsigned long time_elapsed;
-	
-	gettimeofday(&start_time);                                                    
-	factorial(10);
+
+	gettimeofday(&start_time);
+	fibonacci(30);
  	gettimeofday(&end_time);
  	time_elapsed = (end_time.tv_sec - start_time.tv_sec)*1000 + (end_time.tv_usec - start_time.tv_usec)/1000;
- 	perror("test\n");
  	return time_elapsed;
-	
+
 }
 
 /* Main function that takes two arguments from users: period and number of jobs. */
@@ -72,7 +84,8 @@ int main(int argc, char *argv[]) {
 	unsigned long period = atoi(argv[1]);
 	int iterations  = atoi(argv[2]);
 	unsigned long computation = compute_time();
-	
+    printf("%lu\n", computation);
+
 	register_process(pid, period, computation);
 	if(!is_registerd(pid)) {
 		printf("%lu: unable to register. \n", pid);
@@ -80,9 +93,9 @@ int main(int argc, char *argv[]) {
 	}
 	printf("%lu: registerd\n", pid);
 	yield(pid);
-	
+
 	while(iterations >0) {
-		factorial(10);
+		fibonacci(30);
 		yield(pid);
 		iterations--;
 	}
@@ -91,11 +104,5 @@ int main(int argc, char *argv[]) {
 
 }
 
-unsigned long factorial(int n) {
-	if(n == 1)
-		return 1;
-	else
-		return n * factorial(n-1);
-}
 
 
