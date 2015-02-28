@@ -1,9 +1,10 @@
 #include "userapp.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 
-int factorial(int n);
+unsigned long factorial(int n);
 
 /* Write to /proc file to register the process with RMS */
 void register_process(unsigned long pid, unsigned long period, unsigned long computation) {
@@ -25,8 +26,8 @@ int is_registerd(unsigned long pid) {
  		return 0;
  	}
 
- 	int fpid; // this will hold the current PID from file
- 	while(fscanf(fp, "%d", &fpid) != EOF) {
+ 	unsigned long fpid; // this will hold the current PID from file
+ 	while(fscanf(fp, "%lu", &fpid) != EOF) {
  		if(fpid == pid) {
  			is_registerd = 1;
  			break;
@@ -52,23 +53,43 @@ void de_register(unsigned long pid) {
 	system(echo_buf);
 }
 
+unsigned long compute_time(){
+	struct timeval time;
+	gettimeofday(&time);                                                    
+	unsigned int start_time = time.tv_usec;
+	factorial(10);
+ 	gettimeofday(&time);
+ 	time_elapsed = time.tv_usec - start_time;
+ 	return time_elapsed;
+	
+}
 
-
+/* Main function that takes two arguments from users: period and number of jobs. */
 int main(int argc, char *argv[]) {
 	unsigned long pid = getpid();
-
-	register_process(pid, atoi(argv[2]), atoi(argv[3]));
+	unsigned long period = atoi(argv[2]);
+	int iterations  = atoi(argv[3]);
+	unsigned long computation = compute_time();
+	
+	register_process(pid, period, computation);
 	if(!is_registerd(pid)) {
 		printf("%lu: unable to register. \n", pid);
 		exit(1);
 	}
 	printf("%lu: registerd\n", pid);
 	yield(pid);
-
+	
+	while(iterations >0) {
+		factorial(10);
+		yield(pid);
+		iterations--;
+	}
+	de_register(pid);
+	return 0;
 
 }
 
-int factorial(int n) {
+unsigned long factorial(int n) {
 	if(n == 1)
 		return 1;
 	else
