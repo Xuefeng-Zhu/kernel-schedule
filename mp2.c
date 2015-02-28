@@ -141,6 +141,7 @@ void register_handler(char *buf){
    tmp->linux_task = find_task_by_pid(tmp->pid);
    setup_timer(&tmp->wakeup_timer, ready_task, (unsigned long)tmp);
    tmp->state = SLEEPING;
+   tmp->period_start = 0;
 
    if(task_admissible(tmp->period, tmp->computation)) {
       /* Add a task entry */
@@ -173,14 +174,20 @@ void yield_handler(char *buf){
    schedule();
 
    // Set the timer
-   running_duration = (jiffies_to_msecs(jiffies) - sched_task->period_start);
+   if (sched_task->period_start == 0){
+       running_duration = 0;
+   }
+   else{
+       running_duration = (jiffies_to_msecs(jiffies) - sched_task->period_start);
+   }
+
    sleep_duration = sched_task->period - (running_duration % sched_task->period);
    mod_timer(&(sched_task->wakeup_timer), jiffies + msecs_to_jiffies(sleep_duration));
 
-   context_switch(NULL);
+   wake_up_process(dispatch_thread);
    #ifdef DEBUG
    printk("PROCESS YIELDED: %lu\n", pid);
-   #endif   
+   #endif
 }
 
 /* Helper function to deregister a task */
@@ -250,20 +257,23 @@ int context_switch(void *data)
       if(old_task != NULL && new_task->period < old_task->period
        && old_task->state == RUNNING) {
          old_task->state = READY;
-      }       
+      }
 
       if (old_task == NULL || new_task->period < old_task->period){
             new_task->state = RUNNING;
             wake_up_process(new_task->linux_task);
             sparam.sched_priority=99;
-            sched_setscheduler(new_task->linux_task, SCHED_FIFO, &sparam);       
+            sched_setscheduler(new_task->linux_task, SCHED_FIFO, &sparam);
             mp2_current_task = new_task->linux_task;
       }
-   }   
+   }
 
    // Sleep the dispatch thread
    set_current_state(TASK_UNINTERRUPTIBLE);
    schedule();
+   #ifdef DEBUG
+   printk("Finish Context Switching...\n");
+   #endif
 
    return 0;
 }
