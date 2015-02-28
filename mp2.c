@@ -112,7 +112,6 @@ ssize_t write_proc(struct file *filp, const char *user, size_t count, loff_t *of
 {
    char *buf = (char *)kmalloc(count, GFP_KERNEL);
    char type;
-   unsigned long pid;
 
    copy_from_user(buf, user, count);
    type = buf[0];
@@ -120,61 +119,81 @@ ssize_t write_proc(struct file *filp, const char *user, size_t count, loff_t *of
    switch(type)
    {
       case 'R':
-         tmp = kmem_cache_alloc(task_cache, GFP_KERNEL);
-         sscanf(&buf[1], "%lu %lu %lu", &tmp->pid, &tmp->period, &tmp->computation);
-         tmp->linux_task = find_task_by_pid(tmp->pid);
-         setup_timer(&tmp->wakeup_timer, ready_task, (unsigned long)tmp);
-         tmp->state = SLEEPING;
-
-         if(task_admissible(tmp->period, tmp->computation)) {
-            /* Add a task entry */
-            spin_lock(&list_lock);
-            list_add(&(tmp->list), &(pid_sched_list.list));
-            spin_unlock(&list_lock);
-            #ifdef DEBUG
-            printk("PROCESS REGISTERED: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
-            #endif
-         } else {
-            del_timer(&tmp->wakeup_timer);
-            kmem_cache_free(task_cache, tmp);
-            #ifdef DEBUG
-            printk("PROCESS NOT SCHEDUABLE: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
-            #endif
-         }
+         register_handler(buf);
          break;
       case 'Y':
-         /* Switch context */
-         sscanf(&buf[1], "%lu", &pid);
-         // TODO set the task to sleep
-         context_switch(NULL);
-         #ifdef DEBUG
-         printk("PROCESS YIELDED: %lu\n", pid);
-         #endif
+         yield_handler(buf);
          break;
       case 'D':
-         sscanf(&buf[1], "%lu", &pid);
-
-         spin_lock_irqsave(&list_lock);
-         list_for_each_safe(head, next, &pid_sched_list.list) {
-            tmp = list_entry(head, struct pid_sched_list, list);
-            if(tmp->pid == pid) {
-               del_timer(&tmp->wakeup_timer);
-               list_del(head);
-               kmem_cache_free(task_cache, tmp);
-               break;
-
-               #ifdef DEBUG
-               printk("PROCESS DEREGISTERED: %lu\n", pid);
-               #endif
-            }
-         }
-         spin_unlock_irqsave(&list_lock);
+         deregister_handler(buf);
          break;
    }
 
    kfree((void *)buf);
    return count;
 }
+
+
+void register_handler(char *buf){
+   tmp = kmem_cache_alloc(task_cache, GFP_KERNEL);
+   sscanf(&buf[1], "%lu %lu %lu", &tmp->pid, &tmp->period, &tmp->computation);
+   tmp->linux_task = find_task_by_pid(tmp->pid);
+   setup_timer(&tmp->wakeup_timer, ready_task, (unsigned long)tmp);
+   tmp->state = SLEEPING;
+
+   if(task_admissible(tmp->period, tmp->computation)) {
+      /* Add a task entry */
+      spin_lock(&list_lock);
+      list_add(&(tmp->list), &(pid_sched_list.list));
+      spin_unlock(&list_lock);
+      #ifdef DEBUG
+      printk("PROCESS REGISTERED: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
+      #endif
+   } else {
+      del_timer(&tmp->wakeup_timer);
+      kmem_cache_free(task_cache, tmp);
+      #ifdef DEBUG
+      printk("PROCESS NOT SCHEDUABLE: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
+      #endif
+   }
+}
+
+/* Helper function to yield a task */
+void yield_handler(char *buf){
+   unsigned long pid;
+
+   sscanf(&buf[1], "%lu", &pid);
+
+   // TODO set the task to sleep
+   context_switch(NULL);
+   #ifdef DEBUG
+   printk("PROCESS YIELDED: %lu\n", pid);
+   #endif   
+}
+
+/* Helper function to deregister a task */
+void deregister_handler(char *buf){
+   unsigned long pid;
+
+   sscanf(&buf[1], "%lu", &pid);
+
+   spin_lock(&list_lock);
+   list_for_each_safe(head, next, &pid_sched_list.list) {
+      tmp = list_entry(head, struct pid_sched_list, list);
+      if(tmp->pid == pid) {
+         del_timer(&tmp->wakeup_timer);
+         list_del(head);
+         kmem_cache_free(task_cache, tmp);
+         break;
+
+         #ifdef DEBUG
+         printk("PROCESS DEREGISTERED: %lu\n", pid);
+         #endif
+      }
+   }
+   spin_unlock(&list_lock);
+}
+
 
 /* Sets task to ready (callback for when wakeup timer expires)  */
 void ready_task(unsigned long data)
@@ -193,7 +212,6 @@ void ready_task(unsigned long data)
 int context_switch(void *data)
 {
    struct sched_param sparam;
-   struct task_struct *new_task;
 
    struct pid_sched_list *new_entry;
    struct pid_sched_list *old_entry;
@@ -204,7 +222,7 @@ int context_switch(void *data)
    #endif
 
    // Preempt the old task
-   old_entry = get_pcb_from_task(mp2_current_task);
+   old_entry = get_pcb_from_pid(mp2_current_task->pid);
    if(old_entry->state == RUNNING) {
       old_entry->state = READY;
    } else {
@@ -215,15 +233,14 @@ int context_switch(void *data)
    sched_setscheduler(mp2_current_task, SCHED_NORMAL, &sparam);
 
    // Schedule the new task
-   new_task = get_next_task();
-   new_entry = get_pcb_from_task(new_task);
+   new_entry = get_next_task();
    new_entry->state = RUNNING;
-   wake_up_process(new_task);
+   wake_up_process(new_entry->linux_task);
    sparam.sched_priority=99;
-   sched_setscheduler(new_task, SCHED_FIFO, &sparam);
+   sched_setscheduler(new_entry->linux_task, SCHED_FIFO, &sparam);
 
    // Update the current task
-   mp2_current_task = new_task;
+   mp2_current_task = new_entry->linux_task;
 
    // Sleep the dispatch thread
    set_current_state(TASK_INTERRUPTIBLE);
@@ -232,10 +249,10 @@ int context_switch(void *data)
    return 0;
 }
 
-struct pid_sched_list* get_pcb_from_task(struct task_struct *task) {
+struct pid_sched_list* get_pcb_from_pid(unsigned int pid) {
    list_for_each(head, &pid_sched_list.list) {
       tmp = list_entry(head, struct pid_sched_list, list);
-      if(tmp->linux_task == task) {
+      if(tmp->pid == pid) {
          return tmp;
       }
    }
@@ -257,18 +274,17 @@ int task_admissible(unsigned long period, unsigned long computation) {
 }
 
 /* Finds the highest priority ready task in the list */
-struct task_struct *get_next_task(void) {
-   struct task_struct *task = NULL;
+struct pid_sched_list *get_next_task(void) {
+   struct pid_sched_list *sched_task = NULL;
 
-   // TODO return pid_sched_list instead?
    list_for_each(head, &pid_sched_list.list) {
       tmp = list_entry(head, struct pid_sched_list, list);
-      if((tmp->state == READY) && (tmp->period < min_period)) {
-         task = tmp->linux_task;
+      if((tmp->state == READY) && (tmp->period < sched_task->period)) {
+         sched_task = tmp;
       }
    }
 
-   return task;
+   return sched_task;
 }
 
 /* Called when module is loaded */

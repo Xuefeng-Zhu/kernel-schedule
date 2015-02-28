@@ -20,7 +20,7 @@ struct pid_sched_list {
 };
 
 /* Helper function to get a pcb entry from a task */
-struct pid_sched_list* get_pcb_from_task(struct task_struct *task);
+struct pid_sched_list* get_pcb_from_pid(unsigned int pid);
 
 /* Sets task to ready (callback for when wakeup timer expires)  */
 void ready_task(unsigned long data);
@@ -32,7 +32,7 @@ int context_switch(void *data);
 int task_admissible(unsigned long period, unsigned long computation);
 
 /* Helper function to find the next task the dispatch thread should execute */
-struct task_struct *get_next_task(void);
+struct pid_sched_list *get_next_task(void);
 
 /* Helper function to delete the pid RMS list */
 void delete_pid_sched_list(void);
@@ -48,6 +48,15 @@ ssize_t read_proc(struct file *filp, char *user, size_t count, loff_t *offset);
 
 /* /proc file write op */
 ssize_t write_proc(struct file *filp, const char *user, size_t count, loff_t *offset);
+
+/* Helper function to register a task */
+void register_handler(char *buf);
+
+/* Helper function to yield a task */
+void yield_handler(char *buf);
+
+/* Helper function to deregister a task */
+void deregister_handler(char *buf);
 
 /* Called when module is loaded */
 int __init mp2_init(void);
