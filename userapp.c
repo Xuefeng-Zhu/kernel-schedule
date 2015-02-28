@@ -1,6 +1,7 @@
 #include "userapp.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
 #include <time.h>
 
 
@@ -57,10 +58,10 @@ unsigned long compute_time(){
 	struct timeval time;
 	unsigned long time_elapsed;
 	
-	gettimeofday(&time);                                                    
+	gettimeofday(&time, NULL);                                                    
 	unsigned int start_time = time.tv_usec;
 	factorial(10);
- 	gettimeofday(&time);
+ 	gettimeofday(&time, NULL);
  	time_elapsed = time.tv_usec - start_time;
  	return time_elapsed;
 	
@@ -69,8 +70,8 @@ unsigned long compute_time(){
 /* Main function that takes two arguments from users: period and number of jobs. */
 int main(int argc, char *argv[]) {
 	unsigned long pid = getpid();
-	unsigned long period = atoi(argv[2]);
-	int iterations  = atoi(argv[3]);
+	unsigned long period = atoi(argv[1]);
+	int iterations  = atoi(argv[2]);
 	unsigned long computation = compute_time();
 	
 	register_process(pid, period, computation);
