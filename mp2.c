@@ -219,13 +219,12 @@ void deregister_handler(char *buf){
          list_del(head);
          kmem_cache_free(task_cache, tmp);
          break;
-
-         #ifdef DEBUG
-         printk("PROCESS DEREGISTERED: %lu\n", pid);
-         #endif
       }
    }
    spin_unlock_irqrestore(&list_lock, lock_flag);
+   #ifdef DEBUG
+   printk("PROCESS DEREGISTERED: %lu\n", pid);
+   #endif
 }
 
 
