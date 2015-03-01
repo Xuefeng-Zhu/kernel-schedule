@@ -213,6 +213,9 @@ void deregister_handler(char *buf){
       tmp = list_entry(head, struct pid_sched_list, list);
       if(tmp->pid == pid) {
          del_timer(&tmp->wakeup_timer);
+         if (tmp->pid == mp2_current_task->pid){
+            mp2_current_task = NULL;
+         }
          list_del(head);
          kmem_cache_free(task_cache, tmp);
          break;
