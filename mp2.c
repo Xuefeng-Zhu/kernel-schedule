@@ -190,7 +190,7 @@ void yield_handler(char *buf){
       spin_unlock_irqrestore(&list_lock, lock_flag);
       set_task_state(sched_task->linux_task, TASK_UNINTERRUPTIBLE);
       schedule();
-      if (sched_task->pid == mp2_current_task->pid){
+      if (mp2_current_task != NULL && sched_task->pid == mp2_current_task->pid){
          mp2_current_task = NULL;
       }
    }
