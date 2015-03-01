@@ -1,5 +1,6 @@
 #define LINUX
 
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/proc_fs.h>
@@ -44,6 +45,7 @@ static struct kmem_cache *task_cache;
 
 /* Dispatch thread */
 static struct task_struct *dispatch_thread;
+static int thread_flag;
 
 /* Available file operations for mp2/status */
 struct file_operations proc_fops = {
@@ -181,10 +183,15 @@ void yield_handler(char *buf){
        running_duration = (jiffies_to_msecs(jiffies) - sched_task->period_start);
    }
 
-   sleep_duration = sched_task->period - (running_duration % sched_task->period);
-   mod_timer(&(sched_task->wakeup_timer), jiffies + msecs_to_jiffies(sleep_duration));
 
-   wake_up_process(dispatch_thread);
+   sleep_duration = sched_task->period - running_duration;
+   if (sleep_duration > 0){
+      mod_timer(&(sched_task->wakeup_timer), jiffies + msecs_to_jiffies(sleep_duration));
+   }
+   else{
+      wake_up_process(dispatch_thread);
+   }
+   
    #ifdef DEBUG
    printk("PROCESS YIELDED: %lu\n", pid);
    printk("Sleep duration: %lu\n",sleep_duration);
@@ -240,7 +247,7 @@ int context_switch(void *data)
    struct pid_sched_list *new_task;
    struct pid_sched_list *old_task;
 
-   while(1){
+   while(thread_flag){
 
    #ifdef DEBUG
    printk("Context Switching...\n");
@@ -338,7 +345,7 @@ int __init mp2_init(void)
                                   NULL);
 
    dispatch_thread = kthread_create(context_switch, NULL, "mp2_dispatch");
-
+   thread_flag = 1;
    spin_lock_init(&list_lock);
 
    printk(KERN_ALERT "MP2 MODULE LOADED\n");
@@ -353,6 +360,9 @@ void __exit mp2_exit(void)
    #endif
 
    // Cleans up the file entries in /proc and the data structures
+
+   thread_flag = 0;
+   wake_up_process(dispatch_thread);
    kthread_stop(dispatch_thread);
    kmem_cache_destroy(task_cache);
    delete_mp2_proc_files();
