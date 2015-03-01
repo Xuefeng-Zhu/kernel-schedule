@@ -187,6 +187,7 @@ void yield_handler(char *buf){
    wake_up_process(dispatch_thread);
    #ifdef DEBUG
    printk("PROCESS YIELDED: %lu\n", pid);
+   printk("Sleep duration: %lu\n",sleep_duration);
    #endif
 }
 
@@ -221,6 +222,9 @@ void ready_task(unsigned long data)
    exp_task->state = READY;
    exp_task->period_start = jiffies_to_msecs(jiffies);
 
+   #ifdef DEBUG
+   printk("Timer\n" );
+   #endif
    wake_up_process(dispatch_thread);
 
 }
@@ -236,6 +240,7 @@ int context_switch(void *data)
    struct pid_sched_list *new_task;
    struct pid_sched_list *old_task;
 
+   while(1){
 
    #ifdef DEBUG
    printk("Context Switching...\n");
@@ -269,12 +274,12 @@ int context_switch(void *data)
    }
 
    // Sleep the dispatch thread
-   set_current_state(TASK_UNINTERRUPTIBLE);
-   schedule();
+   set_current_state(TASK_INTERRUPTIBLE);
    #ifdef DEBUG
    printk("Finish Context Switching...\n");
    #endif
-
+   schedule();
+   }
    return 0;
 }
 
@@ -308,7 +313,7 @@ struct pid_sched_list *get_next_task(void) {
 
    list_for_each(head, &pid_sched_list.list) {
       tmp = list_entry(head, struct pid_sched_list, list);
-      if((tmp->state == READY) && (tmp->period < sched_task->period)) {
+      if((tmp->state == READY) && (sched_task == NULL || tmp->period < sched_task->period)) {
          sched_task = tmp;
       }
    }
