@@ -183,16 +183,18 @@ void yield_handler(char *buf){
    if (sleep_duration > 0){
       // Set the task to Sleep
       mod_timer(&(sched_task->wakeup_timer), jiffies + msecs_to_jiffies(sleep_duration));
-      wake_up_process(dispatch_thread);
+
       spin_lock_irqsave(&list_lock, lock_flag);
       sched_task->state = SLEEPING;
       spin_unlock_irqrestore(&list_lock, lock_flag);
       set_task_state(sched_task->linux_task, TASK_UNINTERRUPTIBLE);
       schedule();
+      if (sched_task->pid == mp2_current_task->pid){
+         mp2_current_task = NULL;
+      }
    }
-   else{
-      wake_up_process(dispatch_thread);
-   }
+
+   wake_up_process(dispatch_thread);
    
    #ifdef DEBUG
    printk("PROCESS YIELDED: %lu\n", pid);
