@@ -178,14 +178,17 @@ void yield_handler(char *buf){
    else{
        running_duration = (jiffies_to_msecs(jiffies) - sched_task->period_start);
    }
+
    sleep_duration = sched_task->period - running_duration;
-   
    if (sleep_duration > 0){
-         // Set the task to Sleep
+      // Set the task to Sleep
+      mod_timer(&(sched_task->wakeup_timer), jiffies + msecs_to_jiffies(sleep_duration));
+      wake_up_process(dispatch_thread);
+      spin_lock_irqsave(&list_lock, lock_flag);
       sched_task->state = SLEEPING;
+      spin_unlock_irqrestore(&list_lock, lock_flag);
       set_task_state(sched_task->linux_task, TASK_UNINTERRUPTIBLE);
       schedule();
-      mod_timer(&(sched_task->wakeup_timer), jiffies + msecs_to_jiffies(sleep_duration));
    }
    else{
       wake_up_process(dispatch_thread);
@@ -225,8 +228,10 @@ void deregister_handler(char *buf){
 void ready_task(unsigned long data)
 {
    struct pid_sched_list *exp_task = (struct pid_sched_list *)data;
+   spin_lock_irqsave(&list_lock, lock_flag);
    exp_task->state = READY;
    exp_task->period_start = jiffies_to_msecs(jiffies);
+   spin_unlock_irqrestore(&list_lock, lock_flag);
 
    #ifdef DEBUG
    printk("Timer\n" );
@@ -248,43 +253,49 @@ int context_switch(void *data)
 
    while(thread_flag){
 
-   #ifdef DEBUG
-   printk("Context Switching...\n");
-   #endif
+      #ifdef DEBUG
+      printk("Context Switching...\n");
+      #endif   
 
-   // Preempt the old task
-   new_task = get_next_task();
-   if (mp2_current_task != NULL){
-      old_task = get_pcb_from_pid(mp2_current_task->pid);
-      sparam.sched_priority=0;
-      sched_setscheduler(mp2_current_task, SCHED_NORMAL, &sparam);
-   }
-   else{
-      old_task = NULL;
-   }
-
-
-   if (new_task != NULL){
-      if(old_task != NULL && new_task->period < old_task->period
-       && old_task->state == RUNNING) {
-         old_task->state = READY;
+      // Preempt the old task
+      new_task = get_next_task();
+      if (mp2_current_task != NULL){
+         old_task = get_pcb_from_pid(mp2_current_task->pid);
+         sparam.sched_priority=0;
+         sched_setscheduler(mp2_current_task, SCHED_NORMAL, &sparam);
       }
+      else{
+         old_task = NULL;
+      }  
+   
 
-      if (old_task == NULL || new_task->period < old_task->period){
-            new_task->state = RUNNING;
-            wake_up_process(new_task->linux_task);
-            sparam.sched_priority=99;
-            sched_setscheduler(new_task->linux_task, SCHED_FIFO, &sparam);
-            mp2_current_task = new_task->linux_task;
-      }
-   }
+      if (new_task != NULL){
+         if(old_task != NULL && new_task->period < old_task->period
+          && old_task->state == RUNNING) {
+            spin_lock_irqsave(&list_lock, lock_flag);
+            old_task->state = READY;
+            spin_unlock_irqrestore(&list_lock, lock_flag);
+            
+         }  
 
-   // Sleep the dispatch thread
-   set_current_state(TASK_INTERRUPTIBLE);
-   #ifdef DEBUG
-   printk("Finish Context Switching...\n");
-   #endif
-   schedule();
+         if (old_task == NULL || new_task->period < old_task->period){
+               spin_lock_irqsave(&list_lock, lock_flag);
+               new_task->state = RUNNING;
+               spin_unlock_irqrestore(&list_lock, lock_flag);
+               
+               wake_up_process(new_task->linux_task);
+               sparam.sched_priority=99;
+               sched_setscheduler(new_task->linux_task, SCHED_FIFO, &sparam);
+               mp2_current_task = new_task->linux_task;
+         }
+      }  
+
+      #ifdef DEBUG
+      printk("Finish Context Switching...\n");
+      #endif
+      // Sleep the dispatch thread
+      set_current_state(TASK_INTERRUPTIBLE);
+      schedule();
    }
    return 0;
 }
