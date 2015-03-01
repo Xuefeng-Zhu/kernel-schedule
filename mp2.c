@@ -196,7 +196,7 @@ void yield_handler(char *buf){
    }
 
    wake_up_process(dispatch_thread);
-   
+
    #ifdef DEBUG
    printk("PROCESS YIELDED: %lu\n", pid);
    printk("Sleep duration: %lu\n",sleep_duration);
@@ -214,7 +214,7 @@ void deregister_handler(char *buf){
       tmp = list_entry(head, struct pid_sched_list, list);
       if(tmp->pid == pid) {
          del_timer(&tmp->wakeup_timer);
-         if (tmp->pid == mp2_current_task->pid){
+         if (mp2_current_task != NULL &&  tmp->pid == mp2_current_task->pid){
             mp2_current_task = NULL;
          }
          list_del(head);
@@ -260,7 +260,7 @@ int context_switch(void *data)
 
       #ifdef DEBUG
       printk("Context Switching...\n");
-      #endif   
+      #endif
 
       // Preempt the old task
       new_task = get_next_task();
@@ -271,8 +271,8 @@ int context_switch(void *data)
       }
       else{
          old_task = NULL;
-      }  
-   
+      }
+
 
       if (new_task != NULL){
          if(old_task != NULL && new_task->period < old_task->period
@@ -280,20 +280,20 @@ int context_switch(void *data)
             spin_lock_irqsave(&list_lock, lock_flag);
             old_task->state = READY;
             spin_unlock_irqrestore(&list_lock, lock_flag);
-            
-         }  
+
+         }
 
          if (old_task == NULL || new_task->period < old_task->period){
                spin_lock_irqsave(&list_lock, lock_flag);
                new_task->state = RUNNING;
                spin_unlock_irqrestore(&list_lock, lock_flag);
-               
+
                wake_up_process(new_task->linux_task);
                sparam.sched_priority=99;
                sched_setscheduler(new_task->linux_task, SCHED_FIFO, &sparam);
                mp2_current_task = new_task->linux_task;
          }
-      }  
+      }
 
       #ifdef DEBUG
       printk("Finish Context Switching...\n");
