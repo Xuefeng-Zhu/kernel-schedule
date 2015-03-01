@@ -170,22 +170,21 @@ void yield_handler(char *buf){
 
    sscanf(&buf[1], "%lu", &pid);
    sched_task = get_pcb_from_pid(pid);
-   // Set the task to Sleep
-   sched_task->state = SLEEPING;
-   set_task_state(sched_task->linux_task, TASK_UNINTERRUPTIBLE);
-   schedule();
 
-   // Set the timer
+   // calculate release time
    if (sched_task->period_start == 0){
        running_duration = 0;
    }
    else{
        running_duration = (jiffies_to_msecs(jiffies) - sched_task->period_start);
    }
-
-
    sleep_duration = sched_task->period - running_duration;
+   
    if (sleep_duration > 0){
+         // Set the task to Sleep
+      sched_task->state = SLEEPING;
+      set_task_state(sched_task->linux_task, TASK_UNINTERRUPTIBLE);
+      schedule();
       mod_timer(&(sched_task->wakeup_timer), jiffies + msecs_to_jiffies(sleep_duration));
    }
    else{
