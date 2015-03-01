@@ -20,6 +20,7 @@ void register_process(unsigned long pid, unsigned long period, unsigned long com
 	char echo_buf[100];
 	sprintf(echo_buf, "echo R %lu %lu %lu > /proc/mp2/status", pid, period, computation);
 	system(echo_buf);
+	printf("%lu: finish registering...\n", pid);
 }
 
 /* Helper function to check whether a program is successfully registerd in /proc file.
