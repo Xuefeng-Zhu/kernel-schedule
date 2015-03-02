@@ -52,11 +52,11 @@ int is_registerd(unsigned long pid) {
 
 /* Write to /proc file to signal that we have finished task for this period and yield. */
  void yield(unsigned long pid) {
- 	printf("%lu: yileding...\n", pid);
+ 	printf("%lu: yielding...\n", pid);
  	char echo_buf[100];
  	sprintf(echo_buf, "echo Y %lu > /proc/mp2/status", pid);
  	system(echo_buf);
- 	printf("%lu: finish yileding...\n", pid);
+ 	printf("%lu: finish yielding...\n", pid);
  }
 
  /* Write to /proc file to signal that we have finished the application and de-register the process */
