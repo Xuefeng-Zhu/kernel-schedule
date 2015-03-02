@@ -138,26 +138,27 @@ ssize_t write_proc(struct file *filp, const char *user, size_t count, loff_t *of
 
 
 void register_handler(char *buf){
-   tmp = kmem_cache_alloc(task_cache, GFP_KERNEL);
-   sscanf(&buf[1], "%lu %lu %lu", &tmp->pid, &tmp->period, &tmp->computation);
-   tmp->linux_task = find_task_by_pid(tmp->pid);
-   setup_timer(&tmp->wakeup_timer, ready_task, (unsigned long)tmp);
-   tmp->state = SLEEPING;
-   tmp->period_start = 0;
+   struct pid_sched_list *temp_task;
+   temp_task = kmem_cache_alloc(task_cache, GFP_KERNEL);
+   sscanf(&buf[1], "%lu %lu %lu", &temp_task->pid, &temp_task->period, &temp_task->computation);
+   temp_task->linux_task = find_task_by_pid(temp_task->pid);
+   setup_timer(&temp_task->wakeup_timer, ready_task, (unsigned long)temp_task);
+   temp_task->state = SLEEPING;
+   temp_task->period_start = 0;
 
-   if(task_admissible(tmp->period, tmp->computation)) {
+   if(task_admissible(temp_task->period, temp_task->computation)) {
       /* Add a task entry */
       spin_lock_irqsave(&list_lock, lock_flag);
-      list_add(&(tmp->list), &(pid_sched_list.list));
+      list_add(&(temp_task->list), &(pid_sched_list.list));
       spin_unlock_irqrestore(&list_lock, lock_flag);
       #ifdef DEBUG
-      printk("PROCESS REGISTERED: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
+      printk("PROCESS REGISTERED: %lu %lu %lu\n", temp_task->pid, temp_task->period, temp_task->computation);
       #endif
    } else {
-      del_timer(&tmp->wakeup_timer);
-      kmem_cache_free(task_cache, tmp);
+      del_timer(&temp_task->wakeup_timer);
+      kmem_cache_free(task_cache, temp_task);
       #ifdef DEBUG
-      printk("PROCESS NOT SCHEDUABLE: %lu %lu %lu\n", tmp->pid, tmp->period, tmp->computation);
+      printk("PROCESS NOT SCHEDUABLE: %lu %lu %lu\n", temp_task->pid, temp_task->period, temp_task->computation);
       #endif
    }
 }
