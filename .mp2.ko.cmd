@@ -1,1 +1,0 @@
-cmd_/home/abhishek/kernel-schedule/mp2.ko := ld -r -m elf_i386 -T /usr/src/linux-headers-3.13.0-32-generic/scripts/module-common.lds --build-id  -o /home/abhishek/kernel-schedule/mp2.ko /home/abhishek/kernel-schedule/mp2.o /home/abhishek/kernel-schedule/mp2.mod.o
